@@ -5,6 +5,7 @@ from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import NoSuchElementException   
 from selenium.webdriver.common.by import By
 from paper import Paper
 import time
@@ -19,6 +20,12 @@ class CrawlerListIdeas():
         self.tagNameListIdeas = 'List-results-items'
         self.qtdePaginas = 1
         
+    def acceptCookies(self, browser):
+        time.sleep(1)
+        button = browser.find_element_by_class_name('cc-compliance')        
+        button.click()
+        
+        
     def getBrowser(self, link):
         browser = webdriver.Chrome(executable_path='chromedriver.exe')
         browser.get(link)
@@ -31,14 +38,16 @@ class CrawlerListIdeas():
         WebDriverWait(browser, 5).until(element_present)
         return  browser
     
-    def clickButtonNextPage(self, browser):        
-        button = browser. find_element_by_class_name('loadMore-btn')
-        
-        button.submit()
-        #button.click()    
-        
-        time.sleep(2.5)
-        return browser
+    def clickButtonNextPage(self, browser):                        
+        #quando nextAgain for False já leu todos os papers possíveis             
+        try:
+            button = browser.find_element_by_class_name('loadMore-btn')               
+            button.click()
+            nextAgain = True
+        except:
+            nextAgain = False
+            
+        return browser, nextAgain
     
     def getLinks(self, page):        
         soup = BeautifulSoup(page, 'html.parser')        
@@ -74,11 +83,23 @@ class CrawlerListIdeas():
         return self.papers    
     
     
-    def run(self):        
+    def run(self):          
         for i in range(self.qtdePaginas):
             if self.currentPage == '':
                 self.currentPage = self.urlCategoria
                 browser = self.getBrowserElementPresent(self.currentPage, self.tagNameListIdeas)
+                self.acceptCookies(browser)
+                time.sleep(3)
+                
+                while True:
+                    browser, nextAgain = self.clickButtonNextPage(browser)
+                    time.sleep(4) 
+                    print(nextAgain)
+                    print(browser)
+                    if nextAgain == False:
+                        break
+                    
+                    
             else:
                 browser = self.clickButtonNextPage(browser)
             self.getLinks(browser.page_source)   
@@ -90,11 +111,13 @@ class ScrapyPaper():
     
     def __init__(self, papers):
         self.papers = papers
+        self.browserInit = None
         
     def getBrowser(self, link):
-        browser = webdriver.Chrome(executable_path='chromedriver.exe')
-        browser.get(link)        
-        return browser        
+        if self.browserInit == None:
+            self.browserInit = webdriver.Chrome(executable_path='chromedriver.exe')
+        self.browserInit.get(link)        
+        return self.browserInit        
         
     def getHtmlPage(self, link):
         browser = self.getBrowser(link)       
@@ -133,6 +156,7 @@ class ScrapyPaper():
 if __name__ == '__main__':
     c = CrawlerListIdeas()
     papers = c.run()
+   # print(papers)
     
     #p = Paper()
     #p.linkPaper = 'https://ieeexplore.ieee.org/document/8641815/'
